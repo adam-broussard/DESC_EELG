@@ -20,7 +20,10 @@ import speclite.filters as filts
 # ADD FILTER WIDTHS AS BARS IN PLOTS
 # FIX FILTER CONVOLUTIONS
 
-centers_lsst = np.array([3664.37, 4807.02, 6209.82, 7542.84, 8700.52, 9633.00])
+# filter_centers = np.array([3664.37, 4807.02, 6209.82, 7542.84, 8700.52, 9633.00])
+filter_centers = np.array([4807.02, 8700.52, 6209.82, 9633.00, 3664.37, 7542.84])
+filter_edges = [[4094.0,5520.0], [8190.0,9211.0], [5531.0,6889.0], [9206.0,10060.0], [3353.0,3975.0], [6920.0,8166.0]]
+filter_half_width = np.array([ 712.98,  510.48,  679.18,  427.  ,  310.63,  623.16])
 
 noNewLine = '\x1b[1A\x1b[1M'
 font = {'family':'Roboto', 'weight':'light'}
@@ -70,7 +73,7 @@ class lsst_filts:
     def calc_sed_lsst(self, mags):
         sed = np.zeros((6,))   
         for i in range(6):
-            # sed[i] = np.power(10,(mags[0][i] + 48.600)*(-2/5))/(3.34e4*centers_lsst[i]*centers_lsst[i]/1e23)
+            # sed[i] = np.power(10,(mags[0][i] + 48.600)*(-2/5))/(3.34e4*filter_centers[i]*filter_centers[i]/1e23)
             sed[i] = 10**(-.4*mags[0][i]-8.9)*10**6
         return sed
 
@@ -97,9 +100,13 @@ class lsst_filts:
 
     def plot_spec(self, subplot, z):
 
+        ydata = self.lsst_sample(self.lam * (1+z), self.muJ)
+
         subplot.plot(self.lam * (1+z), self.muJ, label = 'Spectrum', zorder = 1)
 
-        subplot.scatter(centers_lsst, self.lsst_sample(self.lam * (1+z), self.muJ), c = 'r', s = 50, zorder = 2)
+        for y in xrange(len(filter_half_width)):
+            subplot.errorbar(filter_centers[y], ydata[y], xerr = filter_half_width[y], fmt = 'o')
+        # subplot.scatter(filter_centers, self.lsst_sample(self.lam * (1+z), self.muJ), c = 'r', s = 50, zorder = 3)
 
         subplot.set_xlabel('Wavelength [$\AA$]', fontsize = 24, fontdict = font)
         subplot.set_ylabel('Flux [$\mu$J]', fontsize = 24, fontdict = font)
@@ -121,7 +128,7 @@ class lsst_filts:
 
             self.plot_spec(subplot, z)
 
-            plt.savefig(saveprefix + str(round(z, 2)) + '.png')
+            plt.savefig(saveprefix + str(round(z, 2)).ljust(4, '0') + '.png')
 
             subplot.cla()
 
