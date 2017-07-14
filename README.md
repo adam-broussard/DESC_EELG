@@ -9,4 +9,4 @@ and a set of python bindings - Python-FSPS, is available at http://dan.iel.fm/py
 
 For ease in using the LSST filter curves, I also recommend insalling Speclite, which provides a set of lightweight tools to play around with spectra, available here: http://speclite.readthedocs.io/en/latest/install.html
 
-If you have any questions, contact met at iyer AT physics DOT rutgers DOT edu
+If you have any questions, contact me at iyer AT physics DOT rutgers DOT edu
