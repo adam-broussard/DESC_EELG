@@ -17,6 +17,9 @@ import speclite
 
 import speclite.filters as filts
 
+# ADD FILTER WIDTHS AS BARS IN PLOTS
+# FIX FILTER CONVOLUTIONS
+
 centers_lsst = np.array([3664.37, 4807.02, 6209.82, 7542.84, 8700.52, 9633.00])
 
 noNewLine = '\x1b[1A\x1b[1M'
@@ -123,7 +126,7 @@ class lsst_filts:
             subplot.cla()
 
         plt.close()
-        
+
 
 
 
