@@ -20,6 +20,7 @@ import speclite.filters as filts
 centers_lsst = np.array([3664.37, 4807.02, 6209.82, 7542.84, 8700.52, 9633.00])
 
 noNewLine = '\x1b[1A\x1b[1M'
+font = {'family':'Roboto', 'weight':'light'}
 
 class lsst_filts:
 
@@ -54,11 +55,9 @@ class lsst_filts:
 
         print noNewLine + 'Generating spectrum...'
 
-        lam, spec = self.starpop.get_spectrum(tage = age)
+        self.lam, self.spec = self.starpop.get_spectrum(tage = age)
 
-        muJ = self.convert_to_microjansky(spec, z)
-
-        return lam, muJ
+        self.muJ = self.convert_to_microjansky(self.spec, z)
 
 
 
@@ -95,7 +94,17 @@ class lsst_filts:
 
     def plot_spec(self, subplot, z):
 
-        pass
+        subplot.plot(self.lam * (1+z), self.muJ, label = 'Spectrum', zorder = 1)
+
+        subplot.scatter(centers_lsst, self.lsst_sample(self.lam * (1+z), self.muJ), c = 'r', s = 50, zorder = 2)
+
+        subplot.set_xlabel('Wavelength [$\AA$]', fontsize = 24, fontdict = font)
+        subplot.set_ylabel('Flux [$\mu$J]', fontsize = 24, fontdict = font)
+        subplot.set_title('LSST Filters', fontsize = 28, fontdict = font)
+
+        subplot.set_xlim(0, 12000)
+        subplot.set_ylim(0, 4.5*10**-8)
+
 
 
 
@@ -105,13 +114,16 @@ class lsst_filts:
 
         subplot = fig.add_subplot(111)
 
-        for z in arange(zmin, zmax, zstep):
+        for z in np.arange(zmin, zmax, zstep):
 
             self.plot_spec(subplot, z)
 
-            save(saveprefix + str(round(z, 2)) + '.png')
+            plt.savefig(saveprefix + str(round(z, 2)) + '.png')
 
             subplot.cla()
 
+        plt.close()
         
+
+
 
