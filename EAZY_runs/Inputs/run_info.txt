@@ -1,0 +1,3 @@
+z = 0.1
+spectra were multiplied up by 10^7
+Runs were without an added template from these spectra
