@@ -114,6 +114,10 @@ class filtersim:
 
             phot_err = [self.error[key] for key in self.keys]
 
+        wavelengths = np.array(wavelengths)
+        phot = np.array(phot)
+        phot_err = np.array(phot_err)
+
         return wavelengths, phot, phot_err
 
 
