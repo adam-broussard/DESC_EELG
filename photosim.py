@@ -5,7 +5,9 @@ from glob import glob
 from filtersim import filtersim
 from astropy.cosmology import Planck15 as cosmo
 from os import system
+from os.path import isfile
 from tqdm import tqdm
+from pandas import read_csv
 
 
 with open('/home/adam/Research/fsps/src/sps_vars.f90', 'r') as readfile:
@@ -26,38 +28,6 @@ class photosim:
     def __init__(self, inputfolder = './adam_synth_spectra/'):
 
         self.filters = filtersim()
-        self.starpop = fsps.StellarPopulation(zcontinuous=1, add_neb_emission = True, imf_type = 1, dust_type = 2) # chabrier IMF and Calzetti dust
-
-        # ============================================
-        # EVERYTHING BELOW THIS POTENTIALLY DEPRECATED
-        # ============================================
-
-        photfiles = sorted(glob(inputfolder + '*'))
-
-        # self.l_nu = [np.array([]),]*10
-        self.l_nu = []
-        self.metallicity = []
-
-        for thisfile in photfiles:
-
-            tempobj = np.loadtxt(thisfile, unpack = True)
-            tempwave = tempobj[0]
-            templuminosities = tempobj[1:]
-
-            self.metallicity.append(float(thisfile.split('_')[-3]))
-            self.wavelength = tempwave
-            self.l_nu.append([thislum * Lsun * 10**7 for thislum in templuminosities])
-
-            # for x in range(len(templuminosities)):
-            #     self.l_nu[x] = np.append(self.l_nu[x], templuminosities[x])
-
-        self.l_lambda = np.array([None,]*20).reshape(2,10)
-
-        for x in range(len(self.l_lambda)):
-            for y in range(len(self.l_lambda[x])):
-                self.l_lambda[x][y] = self.l_nu[x][y] * 3.e10 / (self.wavelength**2.) # Convert L_nu to L_lambda
-
-
 
 
     def redshift(self, redshift, wavelength, l_nu):
@@ -72,12 +42,74 @@ class photosim:
             return new_wavelength, flux
 
 
+    def find_spectrum(self, tage, metallicity, imf_type, sfh_type, dust_type = 2, emline = True, increase_ssp = True, delay_csf = True):
 
-    def writecat(self, sfhtype = ['CSF',]*10, redshiftlist = [0.3,]*10, timelist = range(1,11), metallist = [1.0,]*10, fname = './EAZY_runs/Inputs/default_catalog.cat'):
+        # params = starpop.params.all_params
+        # metallicity = 10.**params['logzsol']
+        # imf_type = params['imf_type']
+        # sfh_type = params['sfh']
+        # dust_type = params['dust_type']
 
-        # Needs errors added - look up the nominal errors for LSST filters
+        # Cache and retreive spectra
 
-        with open(fname, 'w') as writefile:
+        fname_params = (tage, metallicity, imf_type, sfh_type, dust_type)
+
+        fname = '%.5f_%.2f_%i_%i_%i.spec' % fname_params
+
+        fstub = './cache/'
+
+        if emline:
+            fstub = fstub + 'emline/'
+        else:
+            fstub = fstub + 'noemline/'
+
+        if isfile(fstub + fname):
+
+            waves, l_nu = np.loadtxt(fstub + fname, unpack = True)
+
+        else:
+
+            starpop = fsps.StellarPopulation(zcontinuous=1, add_neb_emission = True, nebemlineinspec = emline, imf_type = imf_type, dust_type = dust_type, 
+                sfh = sfh_type, logzsol = np.log10(metallicity), tage = tage) # Calzetti dust
+            if sfh_type == 3:
+                # Form stars at 1Msun/yr for 1Gyr, then spike to 200Msun/yr
+                # starpop.set_tabular_sfh(np.array([0,0.999,1,1.1]), np.array([1,1,10,10]))
+                starpop.set_tabular_sfh(np.array([0,13]), np.array([1,1]))
+                if delay_csf:
+                    tage = tage + 1.
+           
+            waves, l_nu = starpop.get_spectrum(tage = tage)
+
+            l_nu = l_nu * Lsun
+
+            np.savetxt(fstub + fname, np.vstack((waves, l_nu)).T, fmt = '%i   %.6e')
+
+        if increase_ssp and sfh_type == 0:
+            l_nu = l_nu * 10.**7
+
+        return waves, l_nu
+
+            
+
+
+
+
+
+    def gencat(self, cat_input = './EAZY_runs/cat_input.param', cat_output = './EAZY_runs/cat.dat'):
+
+
+        gal_id, redshift, age, sfh, metal, imf = read_csv(cat_input,
+            header = None, comment = '#', delimiter = '\s+').values.T
+
+        sfh_type = np.zeros(len(sfh))
+        imf_type = np.zeros(len(imf))
+
+        imf_type[imf == 'CHABRIER'] = 1
+        imf_type[imf == 'KROUPA'] = 2
+
+        sfh_type[sfh == 'CSF'] = 3
+
+        with open(cat_output, 'w') as writefile:
 
             writefile.write('# ')
             writefile.write('id'.rjust(4))
@@ -88,30 +120,20 @@ class photosim:
                 writefile.write(('f_' + self.filters.keys[x]).ljust(15))
                 writefile.write(('e_' + self.filters.keys[x]).ljust(15))
 
-            writefile.write('z_spec')
+            # writefile.write('z_spec')
 
             writefile.write('\n')
 
-            for x in tqdm(range(len(redshiftlist))):
+            for x in tqdm(xrange(len(gal_id))):
 
-                if sfhtype[x] == 'SSP':
-                    self.starpop = fsps.StellarPopulation(zcontinuous=1, add_neb_emission = True, imf_type = 1, dust_type = 2, 
-                        sfh = 0, logzsol = np.log10(metallist[x])) # chabrier IMF and Calzetti dust
-                elif sfhtype[x] == 'CSF':
-                    self.starpop = fsps.StellarPopulation(zcontinuous=1, add_neb_emission = True, imf_type = 1, dust_type = 2, 
-                        sfh = 3, logzsol = np.log10(metallist[x]))
-                    self.starpop.set_tabular_sfh(np.array([0,1]), np.array([1,1]))
-
-                wavelengths, spec_l_nu = self.starpop.get_spectrum(tage = timelist[x])
+                wavelengths, spec_l_nu = self.find_spectrum(age[x], metal[x], imf_type[x], sfh_type[x])
                 spec_l_lambda = spec_l_nu * (wavelengths**2.) / 3.e10 
 
-                wavelengths, spec_flux = self.redshift(redshiftlist[x], wavelengths, spec_l_lambda)
+                shifted_wavelengths, spec_flux = self.redshift(redshift[x], wavelengths, spec_l_nu)
 
-                # spec_flux = self.l_nu[metallist[x]][timelist[x]]
+                phot_wave, phot_flux, phot_err = self.filters.get_photometry(shifted_wavelengths, spec_flux)
 
-                phot_wave, phot_flux, phot_err = self.filters.get_photometry(wavelengths, spec_flux)
-
-                writefile.write('   %03i' % x)
+                writefile.write('   %03i' % gal_id[x])
                 writefile.write('  ')
 
                 for y in range(len(phot_wave)):
@@ -119,8 +141,11 @@ class photosim:
                     writefile.write(('%.6e' % phot_flux[y]).ljust(15))
                     writefile.write(('%.6e' % phot_err[y]).ljust(15))
 
-                writefile.write('-1.000')
+                # writefile.write('-1.000')
                 writefile.write('\n')
+
+
+
 
 
     def save_temp(self, sfhtype = 'CSF', metallicity = 1.0, time = 0.001, renorm = True, savefp = '/home/adam/Research/eazy-photoz/templates/AdamTemps/'):
@@ -128,23 +153,23 @@ class photosim:
         fname = savefp + sfhtype +'_%iMyr_Z_%.1f.dat' % (time*1000, metallicity)
 
         if sfhtype == 'SSP':
-            self.starpop = fsps.StellarPopulation(zcontinuous=1, add_neb_emission = True, imf_type = 1, dust_type = 2, 
+            starpop = fsps.StellarPopulation(zcontinuous=1, add_neb_emission = True, imf_type = 1, dust_type = 2, 
                 sfh = 0, logzsol = np.log10(metallicity)) # chabrier IMF and Calzetti dust
         elif sfhtype == 'CSF':
-            self.starpop = fsps.StellarPopulation(zcontinuous=1, add_neb_emission = True, imf_type = 1, dust_type = 2, 
+            starpop = fsps.StellarPopulation(zcontinuous=1, add_neb_emission = True, imf_type = 1, dust_type = 2, 
                 sfh = 3, logzsol = np.log10(metallicity))
-            self.starpop.set_tabular_sfh(np.array([0,1]), np.array([1,1]))
+            starpop.set_tabular_sfh(np.array([0,1]), np.array([1,1]))
 
-        wavelength, l_lambda = self.starpop.get_spectrum(tage = time)
+        wavelength, l_nu = self.find_spectrum(starpop, time)
 
         if renorm:
-            l_lambda = 2 * l_lambda / max(l_lambda) # Templates in EAZY seem to be normalized so they peak around 2, so maybe this will help?
+            l_nu = 2 * l_nu / max(l_nu) # Templates in EAZY seem to be normalized so they peak around 2, so maybe this will help?
 
         with open(fname, 'w') as writefile:
 
             for x in range(len(wavelength)):
                 writefile.write(('%.5e' % wavelength[x]).ljust(20))
-                writefile.write('%.5e' % l_lambda[x] + '\n')
+                writefile.write('%.5e' % l_nu[x] + '\n')
 
 
 
