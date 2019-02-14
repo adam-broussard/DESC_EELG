@@ -95,6 +95,8 @@ class filtersim:
 
         # This is slightly different from the above because LSST filters are photon count filters
 
+        # flux_density needs to be in f_nu units
+
         c = 3.e10 # speed of light in cm/s
 
         f_lambda = flux_density * c/(wavelength**2.)
@@ -102,13 +104,15 @@ class filtersim:
         wavelengths = [self.wavelength_centers[key] for key in self.keys]
         phot = []
 
-        interp_x = np.arange(3000, 12000, wavestep)
+        interp_x = np.arange(3000, 12000, wavestep) # The x-axis of the spectrum
 
+        # Loop through each of the LSST filters
         for index, key in enumerate(self.keys):
 
-            interp_y = np.interp(interp_x, wavelength, f_lambda)
+            interp_y = np.interp(interp_x, wavelength, f_lambda) # The interpolated y-axis of the spectrum (in f_lambda)
 
-            filter_interp_y = np.interp(interp_x, self.wavelength[key], self.norm_response[key])
+            # Find the filter curve values at the same x values as interp_x
+            filter_interp_y = np.interp(interp_x, self.wavelength[key], self.norm_response[key]) 
 
             phot.append(np.trapz(filter_interp_y * interp_y * interp_x, x = interp_x)/np.trapz(filter_interp_y * c / interp_x, x = interp_x))
 
